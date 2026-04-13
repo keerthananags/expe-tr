@@ -8,6 +8,8 @@ import authRoutes from "./routes/authRoutes";
 import transactionRoutes from "./routes/transactionRoutes";
 import protectedRoutes from "./routes/protectedRoutes";
 import { protect } from "./middleware/authMiddleware";
+import { errorHandler, notFoundHandler } from "./middleware/errorMiddleware";
+import logger from "./utils/logger";
 
 dotenv.config();
 
@@ -47,14 +49,24 @@ const swaggerOptions = {
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
 
 app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-app.get("/api/docs.json", protect, (_req, res) => res.json(swaggerSpec));
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get("/api/docs.json", (_req, res) => res.json(swaggerSpec));
+app.get("/api-docs.json", (_req, res) => res.json(swaggerSpec));
 
 // Request logger middleware
 app.use((req, res, next) => {
   const start = Date.now();
   res.on("finish", () => {
     const duration = Date.now() - start;
-    console.log(`📣 ${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
+    logger.info({
+      msg: `${req.method} ${req.originalUrl} ${res.statusCode} - ${duration}ms`,
+      method: req.method,
+      url: req.originalUrl,
+      statusCode: res.statusCode,
+      duration,
+      userAgent: req.get('User-Agent'),
+      ip: req.ip
+    });
   });
   next();
 });
@@ -66,17 +78,41 @@ app.use("/api/auth", authRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/protected", protectedRoutes);
 
-// Silence Chrome DevTools probe
-app.get("/.well-known/appspecific/com.chrome.devtools.json", (_, res) => {
-  res.status(204).send();
-});
+app.get("/api", (_req, res) => 
+  res.json({
+    message: "Expense Tracker API is running",
+    endpoints: [
+      "GET /api/health",
+      "POST /api/auth/register",
+      "POST /api/auth/login",
+      "GET /api/auth/me",
+      "GET /api/transactions",
+      "POST /api/transactions",
+      "PUT /api/transactions/:id",
+      "DELETE /api/transactions/:id",
+      "GET /api/transactions/summary",
+      "GET /api/protected"
+    ]
+  })
+);
 
 app.get("/api/health", (_, res) => res.json({ status: "OK" }));
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 mongoose
   .connect(process.env.MONGO_URI!)
   .then(() => {
-    console.log("✅ MongoDB connected");
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    logger.info({
+      msg: "MongoDB connected successfully"
+    });
+    app.listen(PORT, () => logger.info({
+      msg: `Server running on port ${PORT}`
+    }));
   })
-  .catch((err) => console.error("❌ MongoDB error:", err));
+  .catch((err) => logger.error({
+    msg: "MongoDB connection error",
+    error: err.message,
+    stack: err.stack
+  }));
