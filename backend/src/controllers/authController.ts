@@ -3,8 +3,10 @@ import jwt from "jsonwebtoken";
 import User from "../models/User";
 import logger from "../utils/logger";
 
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-key-change-in-production";
+
 const signToken = (id: string) =>
-  jwt.sign({ id }, process.env.JWT_SECRET!, { expiresIn: "7d" });
+  jwt.sign({ id }, JWT_SECRET, { expiresIn: "7d" });
 
 export const register = async (req: Request, res: Response) => {
   try {

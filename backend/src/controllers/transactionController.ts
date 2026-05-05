@@ -15,7 +15,10 @@ export const getTransactions = async (req: Request, res: Response) => {
       if (startDate) {
         const parsedStart = new Date(String(startDate));
         if (Number.isNaN(parsedStart.getTime()))
-          return res.status(400).json({ message: "Invalid startDate" });
+          return res.status(400).
+        
+        
+        json({ message: "Invalid startDate" });
         dateFilter.$gte = parsedStart;
       }
       if (endDate) {
